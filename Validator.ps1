@@ -1,4 +1,22 @@
-﻿ Param (
+﻿<#
+Summary: 
+    IA Framework script to Validate Disk space. 
+    
+Description: 
+    This script gets disk space details and validates/Verifies whether t meets threshold.
+
+Parameters: 
+    ci_name:             Name of VM.
+                            (EX. "VW123456")
+    threshold:            Disk space threshold in percent.
+                            (Ex. 30)
+    writeToFile:          Flag for Creating log file.
+                            (Values : True/False)
+    waitInSec:            Wait time in seconds before each retries. 
+                           (Ex. 10) Default : 10
+#>
+
+Param (
     [Parameter(Mandatory = $true)]
     [string]$ci_name,
     [Parameter(Mandatory = $true)]
@@ -10,7 +28,7 @@
 )
 
 $global:thresholdInGB = 0
-# Function to Write Output to Host/ Log to file(to be implemented later)
+# Function to Write Output to Host/ Log to file
 Function WriteLog{
     Param (
         [string]$log
@@ -27,18 +45,26 @@ Function GetDiskSpace
 	Param(
         [string]$svr
     )
-
-    $disk = ([wmi]"\\$svr\root\cimv2:Win32_logicalDisk.DeviceID='c:'")
-    #"Remotecomputer C: has {0:#.0} GB free of {1:#.0} GB Total" -f ($disk.FreeSpace/1GB),($disk.Size/1GB) | write-output
-    $totalDiskSpace = [math]::Round(($disk.Size/1GB),2)
-    $totalFreeSpace = [math]::Round(($disk.FreeSpace/1GB),2)
-    $global:thresholdInGB = $totalDiskSpace * ($Threshold/100)
-
-    return $totalFreeSpace
+    $reply = "true"
+    $source = Get-PSDrive -PSProvider 'FileSystem'
+    foreach($a in $source) {
+        $drive = $a.Root -replace "\\",""
+        $disk = ([wmi]"\\$svr\root\cimv2:Win32_logicalDisk.DeviceID='$drive'")    
+        #"Remotecomputer C: has {0:#.0} GB free of {1:#.0} GB Total" -f ($disk.FreeSpace/1GB),($disk.Size/1GB) | write-output
+        $totalDiskSpace = [math]::Round(($disk.Size/1GB),2)
+        $totalFreeSpace = [math]::Round(($disk.FreeSpace/1GB),2)
+        $global:thresholdInGB = $totalDiskSpace * ($Threshold/100)
+        
+        if ($totalFreeSpace -le $global:thresholdInGB){
+            $reply = "false"
+            break
+        }
+    }
+    return $reply
 }
 Try{
-    $diskSpace = GetDiskSpace -svr $ci_name
-    if ($diskSpace -ge $global:thresholdInGB){
+    $result = GetDiskSpace -svr $ci_name
+    if ($result -eq 'true'){
         # Disk space within threshold limit
         WriteLog "Validator.ps1 : Execution completed"
         return "true"
