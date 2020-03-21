@@ -1,4 +1,4 @@
-﻿<#
+<#
 Summary: 
     Script to cleanup Disk space. 
     
