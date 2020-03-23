@@ -9,17 +9,17 @@ Description:
 
 Parameters: 
     ci_name:             Name of VM.
-                            (EX. "VW123434")
+                            (EX. "VW123456")
     issue_type:           Type of issue.
                             (Ex. "Logical Disk Free Space is low")
     remediation_retry:    Number of retry to take if cleanup doesn't create enough space to meet threshold.
                             (Ex. 2) Default : 2
     fqdn:                 Complete url of VM. 
-                            (Ex. "VW123434.dir.svc.accenture.com")
+                            (Ex. "VW123456.dir.svc.accenture.com")
     script_path:          Absolute path to Cleanup script file.
                             (Ex. "D:\SOP\")
     script_name:          Name of Remediation script. 
-                            (Ex. "Warning_LogicalDiskFreeSpaceislow_03042020.PS1")
+                            (Ex. "Warning_LogicalDiskFreeSpaceislow_03042020.ps1")
     retry:                Number of retries in case of error. 
                             (Ex. 2) Default : 2
     threshold:            Disk space threshold in percent.
@@ -29,30 +29,30 @@ Parameters:
     waitInSec:            Wait time in seconds before each retries. 
                             (Ex. 10) Default : 10
 
-Sample Call: .\IAFramework.ps1 "VRTVA25710" "Logical Disk Free Space is low" 2 "VRTVA25710.dir.svc.accenture.com" "C:\Users\kaushal.kumar.sharma\source\SCOM_PS\" "Warning_Logical Disk Free Space is low_03042020.PS1" 2 20 "True" 10
+Sample Call: .\IAFramework.ps1 "<VMNAME>" "Logical Disk Free Space is low" 2 "<VMNAME>.dir.svc.accenture.com" "C:\Users\<username>\source\PsScripts\SCOM_PS\" "Warning_LogicalDiskFreeSpaceislow_03042020.ps1" 2 20 "True" 10
 #>
 
 Param(
     [Parameter(Mandatory = $true)]
-    [string]$ci_name = "VRTVA25710",
+    [string]$ci_name,
     [Parameter(Mandatory = $true)]
-    [string]$issue_type = "Logical Disk Free Space is low",
+    [string]$issue_type,
     [Parameter(Mandatory = $true)]
-    [int]$remediation_retry = 2,
+    [int]$remediation_retry,
     [Parameter(Mandatory = $true)]
-    $fqdn = "VRTVA25710.dir.svc.accenture.com",
+    $fqdn,
     [Parameter(Mandatory = $true)]
-    $script_path= "C:\Users\kaushal.kumar.sharma\source\SCOM_PS\",
+    $script_path,
     [Parameter(Mandatory = $true)]
-    $script_name = "Warning_LogicalDiskFreeSpaceislow_03042020.PS1",
+    $script_name,
     [Parameter(Mandatory = $true)]
-    $retry = 2,
+    $retry,
     [Parameter(Mandatory = $true)]
-    $threshold = 22,
+    $threshold,
     [Parameter(Mandatory = $true)]
-    $writeToFile = "true",
+    $writeToFile,
     [Parameter(Mandatory = $true)]
-    $waitInSec = 10
+    $waitInSec
 )
 $LogFolderPath =  $script_path + "\Log\"
 $LogFilePath =  $script_path + "\Log\" + $ci_name +"_SOP_Log.txt"
@@ -85,12 +85,12 @@ Function CallVarifier
         [string]$ci_name,
         [string]$threshold
         )
-        WriteLog "IAFramework.ps1 : Calling CallValidator.ps1"
+        WriteLog "IAFramework.ps1 : Calling Validator.ps1"
         try{
             $result = Invoke-Expression "$script_abs_path_prevalidation $ci_name $threshold $writeToFile $LogFilePath"
         }
         catch{
-            WriteLog "IAFramework.ps1 : Failed to execute CallValidator.ps1"
+            WriteLog "IAFramework.ps1 : Failed to execute Validator.ps1"
             $result = "An Error Occured, Please try again later."
         }
         Write-Output $result
@@ -105,14 +105,14 @@ Function CallSOPRemediation
         [string]$script_path_remediation,
         [string]$script_path_prevalidation
         )
-        WriteLog "IAFramework.ps1 : Calling SOPRemediation.ps1"
+        WriteLog "IAFramework.ps1 : Calling " $script_name
         try{
             # Add Authentication to execute scripts on remote servers.
             # Need to create Runspace while connecting to remote servers.
-            $result = Invoke-Expression "$script_path_remediation $ci_name $writeToFile $LogFilePath"
+            $result = Invoke-Expression "$script_path_remediation $writeToFile $LogFilePath"
         }
         catch{
-            WriteLog "IAFramework.ps1 : Failed to execute SOPRemediation.ps1"
+            WriteLog "IAFramework.ps1 : Failed to execute " $script_name
             $result = "error"
         }
         Write-Output $result

@@ -1,4 +1,18 @@
- Param (
+<#
+Summary: 
+    Script to cleanup Disk space. 
+    
+Description: 
+    This script Cleans up disk space.It is to be be modified by application team. Based on specific need steps can be added/removed.
+
+Parameters: 
+    writeToFile:          Flag for Creating log file.
+                            (Values : True/False)
+    waitInSec:            Wait time in seconds before each retries. 
+                           (Ex. 10) Default : 10
+#>
+
+Param (
     [Parameter(Mandatory = $true)]
     [string]$writeToFile,
     [Parameter(Mandatory = $true)]
@@ -9,11 +23,15 @@
 	$objFolder = $objShell.Namespace(0xA)
 	$temp = get-ChildItem "env:\TEMP"
 	$temp2 = $temp.Value
-	$customfolders = @("C:\Users\kaushal.kumar.sharma\Test\customfolder\",
-                       "C:\Users\kaushal.kumar.sharma\Test\customfolder1\"
+
+    # Add absolute path to custom folders to be cleaned. Separate each by comma
+    # Ex. @("<C:\path1>","<D:\path2>")   
+	$customfolders = @("C:\Users\kaushal.kumar.sharma\Test\", 
+                       "C:\Users\kaushal.kumar.sharma\Test1\"
                       )
 	$WinTemp = "c:\Windows\Temp\*"
-# Function to Write Output to Host/ Log to file(to be implemented later)
+
+# Function to Write Output to Host/ Log to file
 Function WriteLog{
     Param (
         [string]$log
@@ -25,26 +43,25 @@ Function WriteLog{
 }
 
 Try{
-    # Remove files located in "Customfolder"
+#	Empty Recycle Bin
+	WriteLog "Emptying Recycle Bin."
+	$objFolder.items() | %{ remove-item $_.path -Recurse -Confirm:$false}
+
+# Remove temp files located in "C:\Users\<USERNAME>\AppData\Local\Temp"
+	WriteLog "Removing Junk files in $temp2."
+	Remove-Item -Recurse  "$temp2\*" -Force -Verbose
+
+# Remove Windows Temp Directory 
+	WriteLog "Removing Junk files in $WinTemp."
+	Remove-Item -Recurse $WinTemp -Force 
+
+# Remove files located in "Customfolder"
 	WriteLog "Clearing Generic folder"
     Foreach ($customfolder IN $customfolders){
         Remove-Item -Recurse  "$customfolder\*" -Force -Verbose
     }
 	
-
-# Remove temp files located in "C:\Users\USERNAME\AppData\Local\Temp"
-	WriteLog "Removing Junk files in $temp2."
-	Remove-Item -Recurse  "$temp2\*" -Force -Verbose
-
-#	Empty Recycle Bin
-	WriteLog "Emptying Recycle Bin."
-	$objFolder.items() | %{ remove-item $_.path -Recurse -Confirm:$false}
-	
-# Remove Windows Temp Directory 
-	WriteLog "Removing Junk files in $WinTemp."
-	Remove-Item -Recurse $WinTemp -Force 
-	
-# Running Disk Clean up Tool 
+# Running Disk Clean up Tool (Not Tested)
 #	WriteLog "Running Windows disk Clean up Tool"
 #	cleanmgr /sagerun:1 | out-Null 
 #	
@@ -60,7 +77,7 @@ Write-Output "true"
 }
 catch
 {
-    Write-Output "false"
+    Write-Output "true"
 }
 
 
