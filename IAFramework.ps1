@@ -29,7 +29,7 @@ Parameters:
     waitInSec:            Wait time in seconds before each retries. 
                             (Ex. 10) Default : 10
 
-Sample Call: .\IAFramework.ps1 "<VMNAME>" "Logical Disk Free Space is low" 2 "<VMNAME>.dir.svc.accenture.com" "C:\Users\<username>\source\PsScripts\SCOM_PS\" "Warning_LogicalDiskFreeSpaceislow_03042020.ps1" 2 20 "True" 10
+Sample Call: .\IAFramework.ps1 "<VMNAME>" "Logical Disk Free Space is low" 2 "<VMNAME>.dir.svc.accenture.com" "C:\Users\<username>\source\PsScripts\SCOM_PS\" "Warning_LogicalDiskFreeSpaceislow_MMDDYYYY.ps1" 2 20 "True" 10
 #>
 
 Param(
@@ -54,6 +54,7 @@ Param(
     [Parameter(Mandatory = $true)]
     $waitInSec
 )
+$ErrorActionPreference = 'SilentlyContinue'
 $LogFolderPath =  $script_path + "\Log\"
 $LogFilePath =  $script_path + "\Log\" + $ci_name +"_SOP_Log.txt"
 $script_abs_path_prevalidation = $script_path + "\Validator.ps1"
@@ -71,7 +72,7 @@ Function WriteLog{
         New-Item -ItemType Directory -Force -Path $LogFolderPath | Out-Null
     }
     
-    write-Host $log -ForegroundColor Magenta 
+    #write-Host $log -ForegroundColor Magenta 
     if($writeToFile -eq "true"){
         Add-Content $LogFilePath $log
     }
@@ -161,7 +162,7 @@ function StartProcessing{
     $flagValidator = "false"
 
     if($writeToFile -eq "true"){
-        New-item $LogFilePath -Force    
+        New-item $LogFilePath -Force | Out-Null
     }
     
 # Call Validator to ensure if Disk Space is below Threshold

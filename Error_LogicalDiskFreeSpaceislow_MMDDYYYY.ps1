@@ -18,14 +18,15 @@ Param (
     [Parameter(Mandatory = $true)]
     [string]$LogFilePath
     )
-
+    
+    $ErrorActionPreference = 'SilentlyContinue'
 	$objShell = New-Object -ComObject Shell.Application
 	$objFolder = $objShell.Namespace(0xA)
 	$temp = get-ChildItem "env:\TEMP"
 	$temp2 = $temp.Value
 
     # Add absolute path to custom folders to be cleaned. Separate each by comma
-    # Ex. @("<C:\path1>","<D:\path2>")   
+    # Ex. @("<C:\path1\>","<D:\path2\>")   
 	$customfolders = @("C:\Users\kaushal.kumar.sharma\Test\", 
                        "C:\Users\kaushal.kumar.sharma\Test1\"
                       )
@@ -36,7 +37,7 @@ Function WriteLog{
     Param (
         [string]$log
     )
-    write-Host $log -ForegroundColor Magenta 
+    #write-Host $log -ForegroundColor Magenta 
     if($writeToFile -eq "true"){
         Add-Content $LogFilePath $log
     }
@@ -49,7 +50,7 @@ Try{
 
 # Remove temp files located in "C:\Users\<USERNAME>\AppData\Local\Temp"
 	WriteLog "Removing Junk files in $temp2."
-	Remove-Item -Recurse  "$temp2\*" -Force -Verbose
+	Remove-Item -Recurse  "$temp2\*" -Force # -Verbose -ErrorAction SilentlyContinue
 
 # Remove Windows Temp Directory 
 	WriteLog "Removing Junk files in $WinTemp."
@@ -58,7 +59,7 @@ Try{
 # Remove files located in "Customfolder"
 	WriteLog "Clearing Generic folder"
     Foreach ($customfolder IN $customfolders){
-        Remove-Item -Recurse  "$customfolder\*" -Force -Verbose
+        Remove-Item -Recurse  "$customfolder\*" -Force # -Verbose -ErrorAction SilentlyContinue
     }
 	
 # Running Disk Clean up Tool (Not Tested)

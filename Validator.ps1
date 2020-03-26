@@ -28,12 +28,13 @@ Param (
 )
 
 $global:thresholdInGB = 0
+$ErrorActionPreference = 'SilentlyContinue'
 # Function to Write Output to Host/ Log to file
 Function WriteLog{
     Param (
         [string]$log
     )
-    write-Host $log -ForegroundColor Magenta 
+    #write-Host $log -ForegroundColor Magenta 
     if($writeToFile -eq "true"){
         Add-Content $LogFilePath $log
     }
