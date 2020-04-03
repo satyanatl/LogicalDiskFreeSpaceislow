@@ -8,12 +8,14 @@ Description:
 Parameters: 
     ci_name:             Name of VM.
                             (EX. "VW123456")
-    threshold:            Disk space threshold in percent.
+    threshold:           Disk space threshold in percent.
                             (Ex. 30)
-    writeToFile:          Flag for Creating log file.
+    writeToFile:         Flag for Creating log file.
                             (Values : True/False)
-    waitInSec:            Wait time in seconds before each retries. 
+    waitInSec:           Wait time in seconds before each retries. 
                            (Ex. 10) Default : 10
+    caller:              Caller Method.
+                           (Ex. 30)
 #>
 
 Param (
@@ -24,24 +26,26 @@ Param (
     [Parameter(Mandatory = $true)]
     [string]$writeToFile,
     [Parameter(Mandatory = $true)]
-    [string]$LogFilePath
+    [string]$LogFilePath,
+    [Parameter(Mandatory = $true)]
+    [string]$caller
 )
-
-$global:thresholdInGB = 0
 $ErrorActionPreference = 'SilentlyContinue'
 # Function to Write Output to Host/ Log to file
 Function WriteLog{
     Param (
         [string]$log
     )
+    $log = "Validator : $log"
     #write-Host $log -ForegroundColor Magenta 
     if($writeToFile -eq "true"){
         Add-Content $LogFilePath $log
     }
 }
 
-WriteLog "Validator.ps1 : Executing"
-Function GetDiskSpace
+WriteLog "Execution Started"
+# Function to Validte if Cleanup is required
+Function ValidateCleanup
 {
 	Param(
         [string]$svr
@@ -57,27 +61,49 @@ Function GetDiskSpace
         $global:thresholdInGB = $totalDiskSpace * ($Threshold/100)
         
         if ($totalFreeSpace -le $global:thresholdInGB){
+            $global:workingDrive = $drive
+            $global:preCleanupSize = $totalFreeSpace
             $reply = "false"
             break
         }
     }
     return $reply
 }
+# Function to Verify Cleanup
+Function VerifyCleanup
+{
+	Param(
+        [string]$svr
+    )
+    $reply = "true"
+    $disk = ([wmi]"\\$svr\root\cimv2:Win32_logicalDisk.DeviceID='$global:workingDrive'")    
+    $totalFreeSpace = [math]::Round(($disk.FreeSpace/1GB),2)
+    $global:postCleanupSize = $totalFreeSpace
+    if ($totalFreeSpace -le $global:thresholdInGB){
+        $reply = "false"
+    }
+    return $reply
+}
 Try{
-    $result = GetDiskSpace -svr $ci_name
+    if($caller -eq "PreCleanup"){
+        $result = ValidateCleanup -svr $ci_name
+    }
+    else{
+        $result = VerifyCleanup -svr $ci_name
+    }
     if ($result -eq 'true'){
         # Disk space within threshold limit
-        WriteLog "Validator.ps1 : Execution completed"
+        WriteLog "Execution completed"
         return "true"
     }
     else{
         # Disk space not within threshold limit
-        WriteLog "Validator.ps1 :  Execution completed"
+        WriteLog "Execution completed"
         return "false"
     }
     #Write-Host $diskSpace
 }
 Catch{
-    WriteLog "Validator.ps1 : Execution completed"
+    WriteLog "Execution completed"
     return "Error"
 }

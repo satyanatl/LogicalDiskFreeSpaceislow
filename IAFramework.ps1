@@ -54,6 +54,10 @@ Param(
     [Parameter(Mandatory = $true)]
     $waitInSec
 )
+$global:thresholdInGB = $null
+$global:preCleanupSize = $null
+$global:postCleanupSize = $null
+$global:workingDrive = ""
 $ErrorActionPreference = 'SilentlyContinue'
 $LogFolderPath =  $script_path + "\Log\"
 $LogFilePath =  $script_path + "\Log\" + $ci_name +"_SOP_Log.txt"
@@ -62,61 +66,59 @@ $script_abs_path_remediation = $script_path + "\" + $script_name
 $finalReply = ""
 
 
-# Function to Write Output to Host/ Log to file.
+# Function to Write Output to Host/Log to file.
 Function WriteLog{
-    Param (
-        [string]$log
-    )
-    If(!(test-path $LogFolderPath))
-    {
-        New-Item -ItemType Directory -Force -Path $LogFolderPath | Out-Null
-    }
-    
-    #write-Host $log -ForegroundColor Magenta 
-    if($writeToFile -eq "true"){
-        Add-Content $LogFilePath $log
-    }
+Param (
+    [string]$log
+)
+If(!(test-path $LogFolderPath)){
+    New-Item -ItemType Directory -Force -Path $LogFolderPath | Out-Null
 }
-WriteLog "IAFramework.ps1 : Executing"
+$log = "IAFramework : $log"
+#write-Host $log -ForegroundColor Magenta 
+if($writeToFile -eq "true"){
+    Add-Content $LogFilePath $log
+}
+}
 
 # Function to call validator script.
 Function CallVarifier
 {
-    Param (
-        [string]$ci_name,
-        [string]$threshold
-        )
-        WriteLog "IAFramework.ps1 : Calling Validator.ps1"
-        try{
-            $result = Invoke-Expression "$script_abs_path_prevalidation $ci_name $threshold $writeToFile $LogFilePath"
-        }
-        catch{
-            WriteLog "IAFramework.ps1 : Failed to execute Validator.ps1"
-            $result = "An Error Occured, Please try again later."
-        }
-        Write-Output $result
+Param (
+    [string]$ci_name,
+    [string]$threshold,
+    [string]$caller
+)
+WriteLog "Calling Validator.ps1"
+try{
+    $result = Invoke-Expression "$script_abs_path_prevalidation $ci_name $threshold $writeToFile $LogFilePath $caller"
+}
+catch{
+    WriteLog "Failed to execute Validator.ps1"
+    $result = "An Error Occured, Please try again later."
+}
+Write-Output $result
 }
 
 # Function to perform CleanUp
 Function CallSOPRemediation
 {
- 
-    Param (
-        [string]$ci_name,
-        [string]$script_path_remediation,
-        [string]$script_path_prevalidation
-        )
-        WriteLog "IAFramework.ps1 : Calling " $script_name
-        try{
-            # Add Authentication to execute scripts on remote servers.
-            # Need to create Runspace while connecting to remote servers.
-            $result = Invoke-Expression "$script_path_remediation $writeToFile $LogFilePath"
-        }
-        catch{
-            WriteLog "IAFramework.ps1 : Failed to execute " $script_name
-            $result = "error"
-        }
-        Write-Output $result
+Param (
+    [string]$ci_name,
+    [string]$script_path_remediation,
+    [string]$script_path_prevalidation
+)
+WriteLog "Calling $script_name"
+try{
+    # Add Authentication to execute scripts on remote servers.
+    # Need to create Runspace while connecting to remote servers.
+    $result = Invoke-Expression "$script_path_remediation $writeToFile $LogFilePath"
+}
+catch{
+    WriteLog "Failed to execute $script_name"
+    $result = "error"
+}
+Write-Output $result
 }
 
 # Cleanup Retry if Remediation didn't work
@@ -128,94 +130,95 @@ Param (
 )
 $status = "false"
 
-WriteLog "IAFramework.ps1 : RetryRemediation Started."
+WriteLog "RetryRemediation Started."
 For ($retrySOP = 1; $retrySOP -le $remediation_retry; $retrySOP++){
     
-    $logVal = "IAFramework.ps1 : Remediation Retry waiting for " + ($waitInSec) + " seconds"
-    WriteLog $logVal
-    Start-Sleep -s $waitInSec #Wait for few seconds(based on var value) before retrying.
-    $logVal = "IAFramework.ps1 : Remediation Retry " + ($retrySOP)
-    WriteLog $logVal
+$logVal = "Remediation Retry waiting for " + ($waitInSec) + " seconds"
+WriteLog $logVal
+Start-Sleep -s $waitInSec #Wait for few seconds(based on var value) before retrying.
+$logVal = "Remediation Retry " + ($retrySOP)
+WriteLog $logVal
 
-    $resultSOPRemediation1 = CallSOPRemediation -ci_name $ci_name -script_path_remediation $script_abs_path_remediation -script_path_prevalidation $script_abs_path_prevalidation
-    if($resultSOPRemediation1 -eq "true"){
-        $resultValidator1 = CallVarifier -ci_name $ci_name -threshold $threshold
-        if($resultValidator1 -ne $null){
-            if($resultValidator1 -eq "true"){
-                $status = "true"
-                WriteLog "IAFramework.ps1 : Remediation successful after retry."
-            }
+$resultSOPRemediation1 = CallSOPRemediation -ci_name $ci_name -script_path_remediation $script_abs_path_remediation -script_path_prevalidation $script_abs_path_prevalidation
+if($resultSOPRemediation1 -eq "true"){
+    $resultValidator1 = CallVarifier -ci_name $ci_name -threshold $threshold -caller "PostCleanup"
+    if($resultValidator1 -ne $null){
+        if($resultValidator1 -eq "true"){
+            $status = "true"
+            WriteLog "Remediation successful after retry."
         }
     }
 }
-WriteLog "IAFramework.ps1 : RetryRemediation Completed."
+}
+WriteLog "RetryRemediation Completed."
 $status
 }
 
 # Main Function to Monitor all other functions
 function StartProcessing{
-    $counterV1 = 1
-    $counterR = 1
-    $counterV = 1
-    $flagVerifier = "false"
-    $flagSOP = "false"
-    $flagValidator = "false"
+$counterV1 = 1
+$counterR = 1
+$counterV = 1
+$flagVerifier = "false"
+$flagSOP = "false"
+$flagValidator = "false"
 
-    if($writeToFile -eq "true"){
-        New-item $LogFilePath -Force | Out-Null
-    }
+if($writeToFile -eq "true"){
+    New-item $LogFilePath -Force | Out-Null
+    WriteLog "Execution Started"
+}
     
-# Call Validator to ensure if Disk Space is below Threshold
-   
+
 For ($counterV1=1; $counterV1 -le $retry){
     if($flagVerifier = "false"){
-    $resultVerifier = CallVarifier -ci_name $ci_name -threshold $threshold #"40"
+    # Call Validator to ensure if Disk Space is below Threshold
+    $resultVerifier = CallVarifier -ci_name $ci_name -threshold $threshold -caller "PreCleanup" #"40"
     if($resultVerifier -eq "false"){
         $flagVerifier = "true"
         for ($counterR=1; $counterR -le $retry){
             if($flagSOP -eq "false"){
                 $counterR = $counterR + 1
+                # Call Cleanup Script
                 $resultSOPRemediation = CallSOPRemediation -ci_name $ci_name -script_path_remediation $script_abs_path_remediation -script_path_prevalidation $script_abs_path_prevalidation
                 if($resultSOPRemediation -eq "true"){
                     $flagSOP = $resultSOPRemediation
                     for ($counterV=1; $counterV -le $retry){
                         if($flagValidator -eq "false"){
                             $counterV = $counterV + 1
-                            $resultValidator = CallVarifier -ci_name $ci_name -threshold $threshold
+                            $resultValidator = CallVarifier -ci_name $ci_name -threshold $threshold -caller "PostCleanup"
                     
                             if($resultValidator -ne $null){
                                 $flagValidator = "true"
                                 if($resultValidator -eq "true"){
-                                    WriteLog "IAFramework.ps1 : Execution completed" #Disk Cleanup successful
+                                    $logVal = "Execution completed, Cleanup Successful."
+                                    WriteLog $logVal #Disk Cleanup successful
                                 }
                                 else{
                                     # Retry Remediation
-                                    
                                     $resultSOPRemediationRetry = RetryRemediation -ci_name $ci_name -script_path_remediation $script_abs_path_remediation -script_path_prevalidation $script_abs_path_prevalidation
                                     if($resultSOPRemediationRetry -eq "true"){
-                                        WriteLog "IAFramework.ps1 : Execution completed. Remediation Successful."
-                                        $finalReply = Get-Content $LogFilePath
-                                        #$finalReply =  $finalReply1 | Select-Object -Skip 1
-                                        #$finalReply = "IAFramework.ps1 : Execution completed. Remediation Successful."  #Disk Cleanup successful after retry
+                                        $logVal = "Execution completed. Cleanup Successful after retry." 
+                                        WriteLog $logVal #Disk cleanup successful
                                     }
                                     else{
-                                        WriteLog "IAFramework.ps1 : Execution completed, Manual Remeditiation required."
-                                        #$finalReply = "IAFramework.ps1 : Execution completed, Manual Remeditiation required."
-                                        $finalReply = Get-Content $LogFilePath #Disk cleanup not successful
-                                        
+                                        $logVal = "Execution completed, Manual Remeditiation required."
+                                        WriteLog $logVal #Disk cleanup not successful
                                     }
-                                    
                                 }
-                                WriteLog $resultValidator
-                                Write-output $resultValidator
+                                #$finalReply = Get-Content $LogFilePath
+                                $finalReply = $logVal
+                                return $finalReply
                             }
                             else{
                                 if($counterV -gt $retry){
                                     $flagValidator = "true"
                                     exit
                                 }
-                                WriteLog "IAFramework.ps1 : Execution completed"
-                                Write-output $resultValidator
+                                $logVal = "Execution completed, cleanup done"
+                                WriteLog $logVal
+                                #$finalReply = Get-Content $LogFilePath
+                                $finalReply = $logVal
+                                return $finalReply
                             }
                             if($flagValidator -eq "true"){
                                 exit
@@ -225,10 +228,12 @@ For ($counterV1=1; $counterV1 -le $retry){
                 }
                 else{
                     if($counterR -gt $retry){
-                        WriteLog "IAFramework.ps1 : Error occured! Retry Later."
+                        $logVal = "Error occured! Retry Later."
+                        WriteLog $logVal
                         WriteLog "false"
-                        return "false"
                         $flagSOP = "true"
+                        $finalReply = $logVal
+                        return $finalReply
                         exit
                     }
                 }
@@ -240,17 +245,19 @@ For ($counterV1=1; $counterV1 -le $retry){
         $counterV1 = $counterV1 + 1
         if($resultVerifier -eq "true"){
             $flagVerifier = "true"
-            WriteLog "IAFramework.ps1 : Execution completed, No Remediation Required."
-            #$finalReply = "IAFramework.ps1 : Execution completed, No Remediation Required."
-            $finalReply = Get-Content $LogFilePath
+            $logVal = "Execution completed, No Remediation Required."
+            WriteLog $logVal
+            #$finalReply = Get-Content $LogFilePath
+            $finalReply = $logVal
             
             WriteLog "true"
             return $finalReply #Adequate Space in Disk
         }
         else{
-            WriteLog "IAFramework.ps1 : Error occured! Retry Later."
-            #$finalReply = "IAFramework.ps1 : Error occured! Retry Later."
-            $finalReply = Get-Content $LogFilePath
+            $logVal = "Error occured! Retry Later."
+            WriteLog $logVal
+            #$finalReply = Get-Content $LogFilePath
+            $finalReply = $logVal
             WriteLog "error"
             $finalReply  # Network/any error
         }
@@ -262,6 +269,21 @@ For ($counterV1=1; $counterV1 -le $retry){
 
 
 # Call Function to start Remediation Process
-$result = StartProcessing | Select-Object -Skip 1
+$result = StartProcessing
+if($result -notmatch "No Remediation Required"){
+    $msgSuccess = "Disk Cleanup was successful using TAO (Touchless Auto-Healing Orchastration)"
+    $msgFail = "Disk Cleanup had failed using TAO (Touchless Auto-Healing Orchastration)"
+    $newline = "`r`n"
+    $preSpace = "Before Cleanup Disk Space: " + (&{If($preCleanupSize -ne $null) {$preCleanupSize} Else {"..."}})
+    $postSpace = "New Free Disk Space: " + (&{If($postCleanupSize -ne $null) {$postCleanupSize} Else {"..."}})
+    if($result -match "Successful"){
+        $result = "$msgSuccess$newline$result$newline$preSpace$newline$postSpace"
+    }
+    else{
+        $result = "$msgFail$newline$result$newline$preSpace$newline$postSpace"    
+    }
+    #$result1 =  $result | Select-Object -Skip 1
+}
 $result
+
 #Write-Output "Remediation Performed Successfully"

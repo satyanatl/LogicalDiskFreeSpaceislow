@@ -37,6 +37,7 @@ Function WriteLog{
     Param (
         [string]$log
     )
+    $log = "Cleanup : $log"
     #write-Host $log -ForegroundColor Magenta 
     if($writeToFile -eq "true"){
         Add-Content $LogFilePath $log
@@ -47,6 +48,20 @@ Try{
 #	Empty Recycle Bin
 	WriteLog "Emptying Recycle Bin."
 	$objFolder.items() | %{ remove-item $_.path -Recurse -Confirm:$false}
+    $disks = Get-WmiObject Win32_LogicalDisk -Filter "DriveType=3"
+
+    foreach ($disk in $disks)
+    {
+	    if (Test-Path "$($disk.DeviceID)\Recycle")
+	    {
+		    Remove-Item "$($disk.DeviceID)\Recycle" -Force -Recurse
+	    }
+	    else
+	    {
+		    Remove-Item "$($disk.DeviceID)\`$Recycle.Bin" -Force -Recurse 
+	    }
+    }
+    #Clear-RecycleBin -Force
 
 # Remove temp files located in "C:\Users\<USERNAME>\AppData\Local\Temp"
 	WriteLog "Removing Junk files in $temp2."
