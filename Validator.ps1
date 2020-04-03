@@ -53,18 +53,20 @@ Function ValidateCleanup
     $reply = "true"
     $source = Get-PSDrive -PSProvider 'FileSystem'
     foreach($a in $source) {
-        $drive = $a.Root -replace "\\",""
-        $disk = ([wmi]"\\$svr\root\cimv2:Win32_logicalDisk.DeviceID='$drive'")    
-        #"Remotecomputer C: has {0:#.0} GB free of {1:#.0} GB Total" -f ($disk.FreeSpace/1GB),($disk.Size/1GB) | write-output
-        $totalDiskSpace = [math]::Round(($disk.Size/1GB),2)
-        $totalFreeSpace = [math]::Round(($disk.FreeSpace/1GB),2)
-        $global:thresholdInGB = $totalDiskSpace * ($Threshold/100)
+        If($a.Name -ne "A"){
+            $drive = $a.Root -replace "\\",""
+            $disk = ([wmi]"\\$svr\root\cimv2:Win32_logicalDisk.DeviceID='$drive'")    
+            #"Remotecomputer C: has {0:#.0} GB free of {1:#.0} GB Total" -f ($disk.FreeSpace/1GB),($disk.Size/1GB) | write-output
+            $totalDiskSpace = [math]::Round(($disk.Size/1GB),2)
+            $totalFreeSpace = [math]::Round(($disk.FreeSpace/1GB),2)
+            $global:thresholdInGB = $totalDiskSpace * ($Threshold/100)
         
-        if ($totalFreeSpace -le $global:thresholdInGB){
-            $global:workingDrive = $drive
-            $global:preCleanupSize = $totalFreeSpace
-            $reply = "false"
-            break
+            if ($totalFreeSpace -le $global:thresholdInGB){
+                $global:workingDrive = $drive
+                $global:preCleanupSize = $totalFreeSpace
+                $reply = "false"
+                break
+            }
         }
     }
     return $reply
