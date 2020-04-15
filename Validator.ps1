@@ -51,10 +51,12 @@ Function ValidateCleanup
         [string]$svr
     )
     $reply = "true"
-    $source = Get-PSDrive -PSProvider 'FileSystem'
+    $source = Get-WmiObject Win32_LogicalDisk -Filter "DriveType=3"
+    #$source = Get-PSDrive -PSProvider 'FileSystem'
     foreach($a in $source) {
-        If($a.Name -ne "A"){
-            $drive = $a.Root -replace "\\",""
+        If($a.VolumeName -notmatch "Temporary"){
+            #$drive = $a.Root -replace "\\",""
+            $drive = $a.DeviceID
             $disk = ([wmi]"\\$svr\root\cimv2:Win32_logicalDisk.DeviceID='$drive'")    
             #"Remotecomputer C: has {0:#.0} GB free of {1:#.0} GB Total" -f ($disk.FreeSpace/1GB),($disk.Size/1GB) | write-output
             $totalDiskSpace = [math]::Round(($disk.Size/1GB),2)

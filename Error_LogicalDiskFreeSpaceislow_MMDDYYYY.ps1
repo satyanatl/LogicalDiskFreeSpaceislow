@@ -18,18 +18,21 @@ Param (
     [Parameter(Mandatory = $true)]
     [string]$LogFilePath
     )
-    
+    $flagRecycleBin = $true
+    $flagWinTemp = $true
+    $flagUserTemp = $true
+    $flagCustomFolder = $true
+
     $ErrorActionPreference = 'SilentlyContinue'
 	$objShell = New-Object -ComObject Shell.Application
 	$objFolder = $objShell.Namespace(0xA)
 	$temp = get-ChildItem "env:\TEMP"
 	$temp2 = $temp.Value
-
+    $RestrictedPaths = @("","C:","C:Documents and Settings","C:Program Files","C:Program Files (x86)","C:Recovery","C:Windows","D:")
+    
     # Add absolute path to custom folders to be cleaned. Separate each by comma
     # Ex. @("<C:\path1\>","<D:\path2\>")   
-	$customfolders = @("C:\Users\kaushal.kumar.sharma\Test\", 
-                       "C:\Users\kaushal.kumar.sharma\Test1\"
-                      )
+	$customfolders = @("C:\test\\")
 	$WinTemp = "c:\Windows\Temp\*"
 
 # Function to Write Output to Host/ Log to file
@@ -46,55 +49,58 @@ Function WriteLog{
 
 Try{
 #	Empty Recycle Bin
-	WriteLog "Emptying Recycle Bin."
-	$objFolder.items() | %{ remove-item $_.path -Recurse -Confirm:$false}
-    $disks = Get-WmiObject Win32_LogicalDisk -Filter "DriveType=3"
+    if($flagRecycleBin -eq "true"){
+        WriteLog "Emptying Recycle Bin."
+	    $objFolder.items() | %{ remove-item $_.path -Recurse -Confirm:$false}
+        $disks = Get-WmiObject Win32_LogicalDisk -Filter "DriveType=3"
 
-    foreach ($disk in $disks)
-    {
-	    if (Test-Path "$($disk.DeviceID)\Recycle")
-	    {
-		    Remove-Item "$($disk.DeviceID)\Recycle" -Force -Recurse
-	    }
-	    else
-	    {
-		    Remove-Item "$($disk.DeviceID)\`$Recycle.Bin" -Force -Recurse 
-	    }
+        foreach ($disk in $disks)
+        {
+	        if (Test-Path "$($disk.DeviceID)\Recycle")
+	        {
+		        Remove-Item "$($disk.DeviceID)\Recycle" -Force -Recurse
+	        }
+	        else
+	        {
+		        Remove-Item "$($disk.DeviceID)\`$Recycle.Bin" -Force -Recurse 
+	        }
+        }
+        #Clear-RecycleBin -Force
     }
-    #Clear-RecycleBin -Force
+	
 
 # Remove temp files located in "C:\Users\<USERNAME>\AppData\Local\Temp"
-	WriteLog "Removing Junk files in $temp2."
-	Remove-Item -Recurse  "$temp2\*" -Force # -Verbose -ErrorAction SilentlyContinue
-
-# Remove Windows Temp Directory 
-	WriteLog "Removing Junk files in $WinTemp."
-	Remove-Item -Recurse $WinTemp -Force 
-
-# Remove files located in "Customfolder"
-	WriteLog "Clearing Generic folder"
-    Foreach ($customfolder IN $customfolders){
-        Remove-Item -Recurse  "$customfolder\*" -Force # -Verbose -ErrorAction SilentlyContinue
+    if($flagUserTemp -eq "true"){
+        WriteLog "Removing Junk files in $temp2."
+	    Remove-Item -Recurse  "$temp2\*" -Force # -Verbose -ErrorAction SilentlyContinue
     }
 	
-# Running Disk Clean up Tool (Not Tested)
-#	WriteLog "Running Windows disk Clean up Tool"
-#	cleanmgr /sagerun:1 | out-Null 
-#	
-#	$([char]7)
-#	Sleep 1 
-#	$([char]7)
-#	Sleep 1 	
+
+# Remove Windows Temp Directory 
+    if($flagWinTemp -eq "true"){
+        WriteLog "Removing Junk files in $WinTemp."
+	    Remove-Item -Recurse $WinTemp -Force 
+    }
 	
-#	WriteLog "Cleanup task complete" 
 
-
+# Remove files located in "Customfolder"
+    if($flagCustomFolder -eq "true"){
+        WriteLog "Clearing Generic folder"
+        Foreach ($customfolder IN $customfolders){
+            $customfolderWithoutSlash = $customfolder.replace("\","")
+            if($RestrictedPaths -notcontains $customfolderWithoutSlash){
+                if (Test-Path "$customfolder"){
+                    Remove-Item -Recurse  "$customfolder\*" -Force
+                }
+            }
+        }
+    }
+	
 Write-Output "true"
 }
 catch
 {
     Write-Output "true"
 }
-
 
 ##### End of the Script #####
