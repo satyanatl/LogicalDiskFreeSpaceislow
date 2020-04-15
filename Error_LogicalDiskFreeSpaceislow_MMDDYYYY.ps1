@@ -1,4 +1,4 @@
-<#
+﻿<#
 Summary: 
     Script to cleanup Disk space. 
     
@@ -52,7 +52,7 @@ Try{
     if($flagRecycleBin -eq "true"){
         WriteLog "Emptying Recycle Bin."
 	    $objFolder.items() | %{ remove-item $_.path -Recurse -Confirm:$false}
-        $disks = Get-WmiObject Win32_LogicalDisk -Filter "DriveType=3"
+        r
 
         foreach ($disk in $disks)
         {
