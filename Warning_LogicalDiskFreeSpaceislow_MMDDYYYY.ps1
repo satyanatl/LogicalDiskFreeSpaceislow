@@ -18,10 +18,10 @@ Param (
     [Parameter(Mandatory = $true)]
     [string]$LogFilePath
     )
-    $flagRecycleBin = $true
-    $flagWinTemp = $true
-    $flagUserTemp = $true
-    $flagCustomFolder = $true
+    $flagRecycleBin = $false
+    $flagWinTemp = $false
+    $flagUserTemp = $false
+    $flagCustomFolder = $false
 
     $ErrorActionPreference = 'SilentlyContinue'
 	$objShell = New-Object -ComObject Shell.Application
