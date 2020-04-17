@@ -6,10 +6,10 @@ Description:
     This script Cleans up disk space.It is to be be modified by application team. Based on specific need steps can be added/removed.
 
 Parameters: 
-    writeToFile:          Flag for Creating log file.
-                            (Values : True/False)
-    waitInSec:            Wait time in seconds before each retries. 
-                           (Ex. 10) Default : 10
+    writeToFile: Flag for Creating log file.
+        (Values : True/False)
+    waitInSec: Wait time in seconds before each retries. 
+        (Ex. 10) Default : 10
 #>
 
 Param (
@@ -32,7 +32,7 @@ Param (
     
     # Add absolute path to custom folders to be cleaned. Separate each by comma
     # Ex. @("<C:\path1\>","<D:\path2\>")   
-	$customfolders = @("C:\test\\")
+	$customfolders = @("D:\Test1\")
 	$WinTemp = "c:\Windows\Temp\*"
 
 # Function to Write Output to Host/ Log to file
@@ -52,7 +52,7 @@ Try{
     if($flagRecycleBin -eq "true"){
         WriteLog "Emptying Recycle Bin."
 	    $objFolder.items() | %{ remove-item $_.path -Recurse -Confirm:$false}
-        r
+        $disks = Get-WmiObject Win32_LogicalDisk -Filter "DriveType=3"
 
         foreach ($disk in $disks)
         {
