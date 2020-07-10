@@ -1,4 +1,4 @@
-﻿<#
+<#
 Summary: 
     IA Framework script to Validate Disk space. 
     
@@ -111,3 +111,4 @@ Catch{
     WriteLog "Execution completed"
     return "Error"
 }
+##### End of the Script #####

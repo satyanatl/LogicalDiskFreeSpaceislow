@@ -1,0 +1,9 @@
+{
+	"flagRecycleBin":"True",
+	"flagWinTemp":"True",
+	"flagUserTemp":"True",
+	"flagCustomFolder":"False",
+	"flagCustomScripts":"False",
+	"flagEDScripts":"True",
+	"customfolders":["D:\\Taotest\\","D:\\Taotest1\\"]
+}
