@@ -1,10 +1,10 @@
-﻿<#
+<#
 Summary: 
     IA Framework script to perform cleanup. 
     
 Description: 
-    This script is main script which executes SOP remediation script/s. Prior to performing Remediation it validates 
-    whether disk cleanup is required. If required it executes disk cleanup script/s and again validates whether the 
+    This script is main script to executes TAO remediation script/s. Prior to performing Remediation it validates 
+    whether disk cleanup is required. If required, it executes disk cleanup script/s and again validates whether the 
     cleanup have freed up enough space to match threshold.
 
 Parameters: 
@@ -12,15 +12,15 @@ Parameters:
                             (EX. "VW123456")
     issue_type:           Type of issue.
                             (Ex. "Logical Disk Free Space is low")
-    remediation_retry:    Number of retry to take if cleanup doesn't create enough space to meet threshold.
+    remediation_retry:    Number of retries to take if cleanup doesn't create enough space to meet threshold.
                             (Ex. 2) Default : 2
     fqdn:                 Complete url of VM. 
                             (Ex. "VW123456.dir.svc.accenture.com")
     script_path:          Absolute path to Cleanup script file.
-                            (Ex. "D:\SOP\")
+                            (Ex. "D:\TAO\<AIR_ID>\")
     script_name:          Name of Remediation script. 
-                            (Ex. "Warning_LogicalDiskFreeSpaceislow_03042020.ps1")
-    retry:                Number of retries in case of error. 
+                            (Ex. "Warning_LogicalDiskFreeSpaceislow_<MMDDYYYY>.ps1")
+    retry:                Number of retries to take in case of error. 
                             (Ex. 2) Default : 2
     threshold:            Disk space threshold in percent.
                             (Ex. 30)
@@ -28,8 +28,10 @@ Parameters:
                             (Values : True/False)
     waitInSec:            Wait time in seconds before each retries. 
                             (Ex. 10) Default : 10
+    retry_counter:        Retry counter value.
+                            (Ex. 1/2)
 
-Sample Call: .\IAFramework.ps1 "<VMNAME>" "Logical Disk Free Space is low" 2 "<VMNAME>.dir.svc.accenture.com" "C:\Users\<username>\source\PsScripts\SCOM_PS\" "Warning_LogicalDiskFreeSpaceislow_MMDDYYYY.ps1" 2 20 "True" 10
+Sample Call: .\IAFramework.ps1 "<VMNAME>" "Logical Disk Free Space is low" 2 "<VMNAME>.dir.svc.accenture.com" "D:\TAO\<AIR_ID>\" "Warning_LogicalDiskFreeSpaceislow_<MMDDYYYY>.ps1" 2 20 "True" 10 1
 #>
 
 Param(
@@ -52,12 +54,17 @@ Param(
     [Parameter(Mandatory = $true)]
     $writeToFile,
     [Parameter(Mandatory = $true)]
-    $waitInSec
+    $waitInSec,
+    [Parameter(Mandatory = $true)]
+    $retry_counter
 )
 $global:thresholdInGB = $null
 $global:preCleanupSize = $null
 $global:postCleanupSize = $null
 $global:workingDrive = ""
+$global:ed_stat = ""
+$global:retry_counter_val = $retry_counter
+
 $ErrorActionPreference = 'SilentlyContinue'
 $LogFolderPath =  $script_path + "\Log\"
 $LogFilePath =  $script_path + "\Log\" + $ci_name +"_SOP_Log.txt"
@@ -76,7 +83,7 @@ If(!(test-path $LogFolderPath)){
 }
 $log = "IAFramework : $log"
 #write-Host $log -ForegroundColor Magenta 
-if($writeToFile -eq "true"){
+if($writeToFile -eq $true){
     Add-Content $LogFilePath $log
 }
 }
@@ -110,9 +117,8 @@ Param (
 )
 WriteLog "Calling $script_name"
 try{
-    # Add Authentication to execute scripts on remote servers.
-    # Need to create Runspace while connecting to remote servers.
-    $result = Invoke-Expression "$script_path_remediation $writeToFile $LogFilePath"
+    #Calling Error/Warning remediation scripts
+    $result = Invoke-Expression "$script_path_remediation $writeToFile $LogFilePath $script_path"
 }
 catch{
     WriteLog "Failed to execute $script_name"
@@ -166,6 +172,8 @@ $flagValidator = "false"
 if($writeToFile -eq "true"){
     New-item $LogFilePath -Force | Out-Null
     WriteLog "Execution Started"
+    $ParamLog = "Parameters - ci_name: "+ $ci_name + " ,issue_type: " + $issue_type + " ,remediation_retry: " + $remediation_retry + " ,fqdn: " + $fqdn + " ,script_path: " + $script_path + " , script_name: " + $script_name + " ,retry: " + $retry + " ,threshold: " + $threshold + " ,writeToFile: " + $writeToFile + " ,waitInSec: "+ $waitInSec + " ,retry_counter: "+ $retry_counter 
+    WriteLog $ParamLog
 }
     
 
@@ -271,8 +279,10 @@ For ($counterV1=1; $counterV1 -le $retry){
 # Call Function to start Remediation Process
 $result = StartProcessing
 if($result -notmatch "No Remediation Required"){
-    $msgSuccess = "Disk Cleanup was successful using TAO (Touchless Auto-Healing Orchastration)"
-    $msgFail = "Disk Cleanup had failed using TAO (Touchless Auto-Healing Orchastration)"
+    $msgSuccess = "Disk Cleanup was successful using TAO (Touchless Auto-Healing Orchestration) by running cleanup of default locations and (or) by ED script cleanup."
+    $msgFail = "Disk cleanup had failed using TAO (Touchless Auto-Healing Orchestration) ) by running cleanup of default locations and (or) by ED script cleanup which was already initiated."
+    $msgFail_r_ed_running = "Disk Cleanup had failed using TAO (Touchless Auto-Healing Orchestration) by running cleanup of default locations and (or) by ED script cleanup which is still in progress."
+    $msgFail_r_ed_finished = "Disk Cleanup had failed using TAO (Touchless Auto-Healing Orchestration) by running cleanup of default locations and (or) by ED script cleanup which is finished execution."
     $newline = "`r`n"
     $preSpace = "Before Cleanup Disk Space: " + (&{If($preCleanupSize -ne $null) {$preCleanupSize} Else {"..."}})
     $postSpace = "New Free Disk Space: " + (&{If($postCleanupSize -ne $null) {$postCleanupSize} Else {"..."}})
@@ -280,10 +290,20 @@ if($result -notmatch "No Remediation Required"){
         $result = "$msgSuccess$newline$result$newline$preSpace$newline$postSpace"
     }
     else{
-        $result = "$msgFail$newline$result$newline$preSpace$newline$postSpace"    
+        if($retry_counter -ne 1){
+            if($ed_stat -eq "Running"){
+                $result = "$msgFail_r_ed_running$newline$result$newline$preSpace$newline$postSpace"
+            }
+            else{
+                $result = "$msgFail_r_ed_finished$newline$result$newline$preSpace$newline$postSpace"
+            }
+        }
+        else{
+            $result = "$msgFail$newline$result$newline$preSpace$newline$postSpace"    
+        }
+        
     }
     #$result1 =  $result | Select-Object -Skip 1
 }
 $result
-
-#Write-Output "Remediation Performed Successfully"
+##### End of the Script #####
